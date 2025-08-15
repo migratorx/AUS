@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heliaus Order Escalation Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-text {
+            background-image: linear-gradient(to right, #2563eb, #9333ea);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="max-w-4xl mx-auto my-8 p-4 sm:p-8">
+        <div class="bg-white border border-gray-200 rounded-xl shadow-lg p-6 sm:p-8">
+            <!-- Header Section -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-extrabold gradient-text">Heliaus Order Escalation Report</h1>
+                <p class="text-gray-600 mt-2 text-lg">Order #95018 - Clinton Towers Housing Company</p>
+                <p class="text-sm text-gray-500 mt-1">Generated: August 13, 2025</p>
+            </div>
+
+            <!-- Status Banner -->
+            <div class="bg-red-50 border-l-4 border-red-500 text-red-800 p-6 rounded-lg text-center mb-8 shadow-md">
+                <h2 class="text-2xl font-bold">🔴 FINAL NOTICE: CANCELLATION PENDING</h2>
+                <p class="mt-2 text-lg font-semibold">Order is 90 days old and in violation of SLA for 82 days.</p>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Left Column: Details -->
+                <div class="md:col-span-1 space-y-8">
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-5">
+                        <h3 class="text-sm font-bold uppercase text-gray-500 tracking-wider mb-4">Order Details</h3>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Order ID:</span>
+                                <span class="font-semibold text-gray-900">#95018</span>
+                            </div>
+                             <div class="flex justify-between">
+                                <span class="text-gray-600">Order Date:</span>
+                                <span class="font-semibold text-gray-900">05/14/2025</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Order Status:</span>
+                                <span class="font-semibold text-red-600">Waiting on Site Champion</span>
+                            </div>
+                             <div class="flex justify-between">
+                                <span class="text-gray-600">SLA Status:</span>
+                                <span class="font-semibold text-red-600">82 Days Overdue</span>
+                            </div>
+                        </div>
+                    </div>
+                     <div class="bg-gray-50 border border-gray-200 rounded-lg p-5">
+                        <h3 class="text-sm font-bold uppercase text-gray-500 tracking-wider mb-4">Key Contacts</h3>
+                        <div class="space-y-4 text-sm">
+                            <div>
+                                <p class="text-gray-600">Site Champion:</p>
+                                <p class="font-semibold text-gray-900 text-base">Melissa Lee Arroyo</p>
+                                <p class="text-gray-500">Melissa.Arroyo@aus.com</p>
+                            </div>
+                             <div>
+                                <p class="text-gray-600">CSM:</p>
+                                <p class="font-semibold text-gray-900 text-base">Alan Jay Koebrick</p>
+                                <p class="text-gray-500">Alan.Koebrick@aus.com</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Action & Timeline -->
+                <div class="md:col-span-2 space-y-8">
+                    <div class="bg-red-50 border border-red-300 rounded-lg p-6 shadow-md">
+                         <h3 class="text-xl font-bold text-red-800 mb-3">⚠️ Required Action</h3>
+                        <p class="text-gray-700 mb-4">Failure to respond with an approved Site Plan by **Friday, August 22, 2025** will result in this order being cancelled.</p>
+                        <div class="bg-white border border-gray-200 rounded-md p-4">
+                           <p class="font-bold text-gray-800 text-lg">Immediate Kick-off Meeting Required</p>
+                           <p class="text-gray-600 mt-2">The Site Champion must reach out to CSM Alan Koebrick to finalize the site plan. Use the link below to schedule a meeting.</p>
+                           <a href="https://bit.ly/Heliaus-Site-Kick-Off-Koebrick" target="_blank" class="text-blue-600 hover:underline mt-2 inline-block text-sm font-medium">https://bit.ly/Heliaus-Site-Kick-Off-Koebrick</a>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                        <h3 class="text-sm font-bold uppercase text-gray-500 tracking-wider mb-6 text-center">Project Timeline</h3>
+                        <div class="w-full px-2">
+                            <!-- Simplified Progress Bar -->
+                            <div class="relative h-2 bg-gray-200 rounded-full">
+                                <div class="absolute top-0 left-0 h-full bg-red-500 rounded-full" style="width: 100%;"></div>
+                            </div>
+                            <!-- Flexbox-based Labels -->
+                            <div class="flex justify-between mt-3 text-xs">
+                                <div class="text-left">
+                                    <p class="font-bold text-gray-800">Order Placed</p>
+                                    <p class="text-gray-600">05/14/2025</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="font-bold text-red-600">Today</p>
+                                    <p class="text-red-600">08/13/2025</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-black">Cancellation</p>
+                                    <p class="text-black">08/22/2025</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

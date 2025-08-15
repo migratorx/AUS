@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Installation Escalation Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals with Urgent Accents -->
+    <!-- Application Structure Plan: A dashboard-style layout was chosen to immediately surface the most critical information. The structure flows from a high-level summary (KPIs for stalled projects) to visual analysis (charts for stalled projects) and finally to a granular, unified details table for all projects. This top-down approach allows users to grasp the severity of the stalled situation instantly, then explore the full context in a single, sortable list. -->
+    <!-- Visualization & Content Choices: 
+        - KPI Cards (HTML/CSS): Goal: Inform. Provides an immediate, high-impact summary of the STALLED projects' scale. Justification: Faster to parse than a table.
+        - Bar Chart (Chart.js): Goal: Compare. Visually represents the 'Days Overdue' for STALLED projects. Justification: A visual comparison is more powerful for identifying critical delays.
+        - Doughnut Chart (Chart.js): Goal: Proportions. Shows the proportion of STALLED projects in different overdue timeframes. Justification: Provides a clear part-to-whole relationship view.
+        - Interactive Table (HTML/JS): Goal: Organize/Explore. Provides all raw data for ALL projects (Stalled, On Hold, etc.) with sorting capabilities. Justification: Creates a single source of truth for all active projects.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .table-cell-truncate {
+            max-width: 250px;
+            white-space: normal;
+        }
+        .sort-asc::after {
+            content: ' ▲';
+            font-size: 0.7em;
+        }
+        .sort-desc::after {
+            content: ' ▼';
+            font-size: 0.7em;
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Project Status Report</h1>
+            <p class="text-slate-500 mt-2">Status From: August 2025 - <span class="font-semibold text-red-600">Urgent Action Required Stalled Projects</span></p>
+        </header>
+
+        <main>
+            <!-- KPI Section -->
+            <section id="kpi-section" class="mb-8">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-slate-800">High-Level Summary: Stalled Projects</h2>
+                    <p class="text-slate-500 mt-1">This Section Provides Immediate Overview From The Current Crisis With Stalled Projects Post-Shipment.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-center">
+                    <div class="bg-slate-50 p-6 rounded-lg shadow-md border-l-4 border-red-500">
+                        <h3 class="text-slate-500 text-lg">Total Stalled Projects</h3>
+                        <p id="total-projects" class="text-4xl font-bold text-red-600 mt-2"></p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-lg shadow-md border-l-4 border-yellow-500">
+                        <h3 class="text-slate-500 text-lg">Avg. Days Overdue</h3>
+                        <p id="avg-days" class="text-4xl font-bold text-yellow-600 mt-2"></p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-lg shadow-md border-l-4 border-blue-500">
+                        <h3 class="text-slate-500 text-lg">Most Overdue Project</h3>
+                        <p id="most-overdue" class="text-4xl font-bold text-blue-600 mt-2"></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualizations Section -->
+            <section id="charts-section" class="mb-8">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-slate-800">Visual Analysis: Stalled Projects</h2>
+                    <p class="text-slate-500 mt-1">These Charts Help Visualize Project Delays From The Stalled Projects.</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-slate-50 p-4 md:p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-center mb-4">Days Overdue Project</h3>
+                        <div class="chart-container" id="overdueChartContainer">
+                            <canvas id="overdueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 md:p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-center mb-4">Distribution From Overdue Projects</h3>
+                        <div class="chart-container">
+                            <canvas id="overdueDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Table Section -->
+            <section id="table-section" class="mb-12">
+                 <div class="text-center mb-6">
+                    <h2 class="text-2xl font-semibold text-slate-800">Detailed Project View: Projects</h2>
+                    <p class="text-slate-500 mt-1">Sort The Data Clicking The Column Headers.</p>
+                </div>
+                <div class="bg-slate-50 p-4 md:p-6 rounded-lg shadow-md">
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b bg-slate-100">
+                                    <th class="p-3 cursor-pointer" data-sort="jobId">Job</th>
+                                    <th class="p-3">Client & Site</th>
+                                    <th class="p-3">Site Champion</th>
+                                    <th class="p-3 cursor-pointer sort-desc" data-sort="daysOverdue">Days Overdue</th>
+                                    <th class="p-3">Last Activity / Note</th>
+                                    <th class="p-3">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="project-table-body">
+                                <!-- JS will populate this -->
+                            </tbody>
+                        </table>
+                         <p id="no-results" class="text-center p-8 text-slate-500 hidden">Projects Match Your Criteria.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script>
+        const projectData = [
+            { jobId: '248522', client: 'BOA 206 Main St (248522) - #1404922', ref: '#1404922', lastActivity: '2025-07-14', status: 'Stalled - Escalated', siteChampion: 'Scott DiPillo' },
+            { jobId: '115000000', client: 'Fordham University - Lincoln Center (115000000) - #1215378', ref: '#1215378', lastActivity: '2025-07-25', status: 'Stalled - Escalated', siteChampion: 'Matthew Bird' },
+            { jobId: '16402citi', client: 'Brosnan - Command Center - Branch - Citibank (16402citi) - #1399231', ref: '#1399231', lastActivity: '2025-06-20', status: 'Stalled - Escalated', siteChampion: 'John Kocotos' },
+            { jobId: '644730', client: 'PNC-Metro-11 Penn Plaza (644730) - #1259207', ref: '#1259207', lastActivity: '2025-08-04', status: 'Stalled - Escalated', siteChampion: 'Angel Martoral' },
+            { jobId: '638570', client: 'MetLife-Warwick (638570) - #1256684', ref: '#1256684', lastActivity: '2025-08-05', status: 'Stalled - Escalated', siteChampion: 'Dailyn Giorgio' },
+            { jobId: '247063', client: 'Hampshire Mall - Spinoso (247063) - #1370550', ref: '#1370550', lastActivity: '2025-06-05', status: 'Stalled - Escalated', siteChampion: 'Shawn Gallagher' },
+            { jobId: '275837', client: 'Kedrion Biopharma - Melville, NY (275837) - #1398404', ref: '#1398404', lastActivity: '2025-07-21', status: 'Stalled - Escalated', siteChampion: 'Nashon Richard' },
+            { jobId: '636027', client: 'Travelers - Tower Square CPO (636027) - #1261595', ref: '#1261595', lastActivity: '2025-05-07', status: 'Stalled - Escalated', siteChampion: 'Jody Millett' },
+        ];
+
+        const today = new Date('2025-08-15');
+        
+        let sortState = {
+            column: 'daysOverdue',
+            direction: 'desc'
+        };
+
+        let overdueChartInstance, overdueDistributionChartInstance;
+
+        function capitalizeWords(text) {
+            if (!text) return '';
+            return text.split(' ').map(word => {
+                if (word.length > 3) {
+                    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+                }
+                return word;
+            }).join(' ');
+        }
+
+        function calculateDaysOverdue(lastActivityDate) {
+            const lastDate = new Date(lastActivityDate);
+            const diffTime = Math.abs(today - lastDate);
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        const processedData = projectData.map(p => {
+            if (p.status === 'Stalled - Escalated') {
+                return { ...p, daysOverdue: calculateDaysOverdue(p.lastActivity) };
+            }
+            return { ...p, daysOverdue: null }; // Set null for non-stalled projects
+        });
+
+        function renderTable(data) {
+            const tableBody = document.getElementById('project-table-body');
+            tableBody.innerHTML = '';
+
+            data.forEach(p => {
+                const row = document.createElement('tr');
+                row.className = 'border-b hover:bg-slate-100';
+
+                let statusBadge;
+                switch(p.status) {
+                    case 'On Hold':
+                        statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-orange-800 bg-orange-100 rounded-full">${capitalizeWords(p.status)}</span>`;
+                        break;
+                    case 'Waiting on Site Champion':
+                        statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-blue-800 bg-blue-100 rounded-full">${capitalizeWords(p.status)}</span>`;
+                        break;
+                    default: // Stalled - Escalated
+                        statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">${capitalizeWords(p.status)}</span>`;
+                }
+
+                const daysOverdueCell = p.daysOverdue !== null
+                    ? `<td class="p-3 font-semibold text-red-700">${p.daysOverdue}</td>`
+                    : `<td class="p-3 text-slate-500">N/A</td>`;
+                
+                const siteChampionCell = p.siteChampion
+                    ? `<td class="p-3">${capitalizeWords(p.siteChampion)}</td>`
+                    : `<td class="p-3 text-slate-500">N/A</td>`;
+
+                row.innerHTML = `
+                    <td class="p-3 font-medium">${p.jobId}</td>
+                    <td class="p-3 table-cell-truncate" title="${p.client}">${capitalizeWords(p.client.replace(/\s*\([^)]*\)/g, ''))}</td>
+                    ${siteChampionCell}
+                    ${daysOverdueCell}
+                    <td class="p-3">${p.lastActivity}</td>
+                    <td class="p-3">${statusBadge}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        function updateKPIs(data) {
+            const totalProjectsEl = document.getElementById('total-projects');
+            const avgDaysEl = document.getElementById('avg-days');
+            const mostOverdueEl = document.getElementById('most-overdue');
+
+            totalProjectsEl.textContent = data.length;
+            
+            if(data.length > 0) {
+                const totalDays = data.reduce((sum, p) => sum + p.daysOverdue, 0);
+                avgDaysEl.textContent = Math.round(totalDays / data.length);
+                mostOverdueEl.textContent = `${Math.max(...data.map(p => p.daysOverdue))} Days`;
+            } else {
+                avgDaysEl.textContent = '0';
+                mostOverdueEl.textContent = '0 Days';
+            }
+        }
+
+        function renderCharts(data) {
+            renderOverdueChart(data);
+            renderOverdueDistributionChart(data);
+        }
+
+        function renderOverdueChart(data) {
+            const ctx = document.getElementById('overdueChart').getContext('2d');
+            const chartData = [...data].sort((a,b) => b.daysOverdue - a.daysOverdue);
+            
+            const container = document.getElementById('overdueChartContainer');
+            const newHeight = chartData.length * 28 + 80;
+            container.style.height = `${newHeight}px`;
+            
+            if (overdueChartInstance) {
+                overdueChartInstance.destroy();
+            }
+
+            overdueChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.map(p => capitalizeWords(p.client.split('(')[0].trim())),
+                    datasets: [{
+                        label: 'Days Overdue',
+                        data: chartData.map(p => p.daysOverdue),
+                        backgroundColor: 'rgba(220, 38, 38, 0.7)',
+                        borderColor: 'rgba(220, 38, 38, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Days Overdue' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Client' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const index = context[0].dataIndex;
+                                    const project = chartData[index];
+                                    return capitalizeWords(project.client);
+                                },
+                                label: function(context) {
+                                     const index = context[0].dataIndex;
+                                    const project = chartData[index];
+                                    return `Job ID: ${project.jobId} | Days Overdue: ${context.raw}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderOverdueDistributionChart(data) {
+            const ctx = document.getElementById('overdueDistributionChart').getContext('2d');
+            
+            const buckets = {
+                '0-30 Days': 0,
+                '31-60 Days': 0,
+                '61-90 Days': 0,
+                '91+ Days': 0,
+            };
+
+            data.forEach(p => {
+                if(p.daysOverdue === null) return;
+                if (p.daysOverdue > 90) {
+                    buckets['91+ Days']++;
+                } else if (p.daysOverdue > 60) {
+                    buckets['61-90 Days']++;
+                } else if (p.daysOverdue > 30) {
+                    buckets['31-60 Days']++;
+                } else {
+                    buckets['0-30 Days']++;
+                }
+            });
+
+            const labels = Object.keys(buckets);
+            const values = Object.values(buckets);
+
+            if (overdueDistributionChartInstance) {
+                overdueDistributionChartInstance.destroy();
+            }
+
+            overdueDistributionChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '# of Projects',
+                        data: values,
+                        backgroundColor: [
+                            'rgba(251, 191, 36, 0.7)',
+                            'rgba(249, 115, 22, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(159, 18, 57, 0.7)',
+                        ],
+                        borderColor: [
+                            'rgba(251, 191, 36, 1)',
+                            'rgba(249, 115, 22, 1)',
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(159, 18, 57, 1)',
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    }
+                }
+            });
+        }
+
+        function sortData(data) {
+            data.sort((a, b) => {
+                const valA = a[sortState.column];
+                const valB = b[sortState.column];
+
+                // Push nulls to the bottom
+                if (valA === null) return 1;
+                if (valB === null) return -1;
+                
+                let comparison = 0;
+                if (valA > valB) {
+                    comparison = 1;
+                } else if (valA < valB) {
+                    comparison = -1;
+                }
+                
+                return sortState.direction === 'desc' ? comparison * -1 : comparison;
+            });
+            return data;
+        }
+
+        function updateAll() {
+            const sortedData = sortData([...processedData]);
+            const stalledProjects = processedData.filter(p => p.status === 'Stalled - Escalated');
+            
+            renderTable(sortedData);
+            updateKPIs(stalledProjects);
+            renderCharts(stalledProjects);
+        }
+        
+        function handleSort(e) {
+            const newSortColumn = e.target.dataset.sort;
+            if (!newSortColumn) return;
+
+            if (sortState.column === newSortColumn) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = newSortColumn;
+                sortState.direction = 'desc';
+            }
+
+            document.querySelectorAll('th[data-sort]').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            e.target.classList.add(sortState.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+
+            updateAll();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateAll();
+            document.querySelector('thead').addEventListener('click', handleSort);
+        });
+    </script>
+</body>
+</html>
+

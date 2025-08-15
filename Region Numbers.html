@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Regional Health Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f9fc;
+            --bg-panel: #ffffff;
+            --text-primary: #172b4d;
+            --text-secondary: #5e6c84;
+            --border-color: #dfe1e6;
+            --status-excellent: #00875a; /* Dark Green */
+            --status-good: #84cc16;      /* Yellow-Green */
+            --status-fair: #f97316;      /* Orange */
+            --status-poor: #de350b;      /* Red */
+            --chart-missed-bg: #f1f5f9;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .panel {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { 
+            animation: fadeIn 1s ease-out forwards; 
+        }
+
+        .text-status-excellent { color: var(--status-excellent); }
+        .text-status-good { color: var(--status-good); }
+        .text-status-fair { color: var(--status-fair); }
+        .text-status-poor { color: var(--status-poor); }
+        
+        .chart-gradient-excellent { background-image: linear-gradient(to top, rgba(0, 135, 90, 0.1), transparent); }
+        .chart-gradient-good { background-image: linear-gradient(to top, rgba(132, 204, 22, 0.1), transparent); }
+        .chart-gradient-fair { background-image: linear-gradient(to top, rgba(249, 115, 22, 0.1), transparent); }
+        .chart-gradient-poor { background-image: linear-gradient(to top, rgba(222, 53, 11, 0.1), transparent); }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="w-full max-w-7xl mx-auto animate-fade-in">
+      
+        <!-- Main Header -->
+        <header class="mb-10 flex justify-between items-center border-b pb-4">
+          <div>
+            <h1 class="text-3xl font-bold text-text-primary tracking-tight">HELIAUS - Regional Site Health</h1>
+            <p class="text-text-secondary text-lg mt-1">Northeast Region Performance Overview</p>
+          </div>
+          <img src="https://www.aus.com/themes/custom/aus/build/assets/images/allied-logo.svg" alt="Allied Universal Logo" class="h-12">
+        </header>
+
+        <!-- President's Section -->
+        <div id="president-section" class="mb-12">
+            <!-- President card will be injected here -->
+        </div>
+
+        <!-- VPs Section -->
+        <div>
+            <h2 class="text-2xl font-bold text-text-primary mb-6">Regional Vice President Overview</h2>
+            <div id="regional-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                <!-- Regional VP cards will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Entry Modal -->
+    <div id="data-entry-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Update Report Data</h2>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <p class="text-text-secondary mb-4">Paste the new JSON data for the report below. The report will update automatically.</p>
+            <textarea id="json-input" class="w-full h-64 p-3 border border-border-color rounded-md font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+            <div class="mt-6 flex justify-end">
+                <button id="update-data-btn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Update Report</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            let currentData = [
+                { id: 1000, name: "Kennedy, Caress C", role: "NE President", title: "NE President", totalSites: 829, avgScore: 77 },
+                { id: 10172, name: "M. Celaj", role: "RVP", title: "RVP, NE: NY 36th/LI", totalSites: 129, avgScore: 74 },
+                { id: 10004, name: "Tonzelli, Mario", role: "RVP", title: "RVP, NE: CT/ West NY", totalSites: 164, avgScore: 76 },
+                { id: 10048, name: "Sacchetti, Stephen", role: "RVP", title: "RVP, NE: NY William St / WP", totalSites: 78, avgScore: 78 },
+                { id: 10003, name: "S. Celaj", role: "RVP", title: "RVP, NE: NY William St", totalSites: 37, avgScore: 77 },
+                { id: 10218, name: "Falco, Joe", role: "RVP", title: "RVP, NE: NY 36th/William St", totalSites: 130, avgScore: 73 },
+                { id: 10049, name: "Hamilton, Darin V", role: "RVP", title: "RVP, NE: NY William St", totalSites: 15, avgScore: 75 },
+                { id: 10008, name: "Blanchette, Patrick", role: "RVP", title: "RVP, NE: MA/RI/NH/ME", totalSites: 276, avgScore: 82 }
+            ];
+
+            const modal = document.getElementById('data-entry-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const updateDataBtn = document.getElementById('update-data-btn');
+            const jsonInput = document.getElementById('json-input');
+
+            // --- Main Render Function ---
+            function renderDashboard(data) {
+                const presidentSection = document.getElementById('president-section');
+                const grid = document.getElementById('regional-grid');
+                
+                // Clear existing content
+                presidentSection.innerHTML = '';
+                grid.innerHTML = '';
+                
+                // --- Separate President and VPs ---
+                const president = data.find(r => r.role === "NE President");
+                const vps = data.filter(r => r.role !== "NE President");
+
+                // --- Render President Card ---
+                if (president) {
+                    const ratingInfo = getMetricRating(president.avgScore);
+                    const panel = document.createElement('div');
+                    panel.className = 'panel rounded-xl p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-center';
+                    
+                    panel.innerHTML = `
+                        <div class="md:col-span-4">
+                            <h2 class="text-2xl font-bold text-text-primary">${president.name}</h2>
+                            <p class="text-lg text-text-secondary">${president.title}</p>
+                            
+                            <div class="mt-8 space-y-6">
+                                <div class="flex items-start">
+                                    <div class="p-3 bg-blue-100 rounded-lg"><svg class="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 100 15 7.5 7.5 0 000-15z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 19.5L15 15" /></svg></div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-text-secondary">Avg. Health Score</p>
+                                        <p class="text-3xl font-extrabold ${ratingInfo.colorClass}">${president.avgScore} <span class="text-xl font-medium text-text-secondary">(${ratingInfo.rating})</span></p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start">
+                                    <div class="p-3 bg-green-100 rounded-lg"><svg class="h-6 w-6 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.75M9 11.25h6.75M9 15.75h6.75" /></svg></div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-text-secondary">Total Sites</p>
+                                        <p class="text-3xl font-extrabold text-text-primary">${president.totalSites}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="md:col-span-8 h-64 p-4 rounded-lg ${ratingInfo.gradientClass}">
+                            <canvas id="chart-${president.id}"></canvas>
+                        </div>
+                    `;
+                    presidentSection.appendChild(panel);
+                    
+                    const vpLabels = vps.map(vp => vp.name.split(',')[0]);
+                    const vpScores = vps.map(vp => vp.avgScore);
+                    createBarChart(`chart-${president.id}`, vpLabels, vpScores);
+                }
+
+                // --- Render VP Cards ---
+                vps.forEach(region => {
+                    const ratingInfo = getMetricRating(region.avgScore);
+                    const panel = document.createElement('div');
+                    panel.className = 'panel rounded-xl p-6 flex flex-col justify-between';
+                    
+                    panel.innerHTML = `
+                        <div>
+                            <h3 class="font-semibold text-lg text-text-primary truncate">${region.name}</h3>
+                            <p class="text-sm text-text-secondary">${region.title}</p>
+                        </div>
+                        <div class="flex items-center justify-between mt-6">
+                            <div class="relative w-28 h-28">
+                                <canvas id="chart-${region.id}"></canvas>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                    <span class="text-3xl font-extrabold ${ratingInfo.colorClass}">${region.avgScore}</span>
+                                    <span class="text-xs font-medium text-text-secondary">${ratingInfo.rating}</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-medium text-text-secondary">Total Sites</p>
+                                <p class="text-3xl font-extrabold text-text-primary">${region.totalSites}</p>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(panel);
+                    createGaugeChart(`chart-${region.id}`, region.avgScore);
+                });
+            }
+
+
+            // --- Helper to get computed style of CSS variables ---
+            function getCssVariable(variable) {
+                return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+            }
+
+            // --- Universal Color & Rating Logic ---
+            function getMetricRating(value) {
+                if (value >= 75) return { rating: 'Excellent', colorClass: 'text-status-excellent', hex: getCssVariable('--status-excellent'), gradientClass: 'chart-gradient-excellent' };
+                if (value >= 50) return { rating: 'Good', colorClass: 'text-status-good', hex: getCssVariable('--status-good'), gradientClass: 'chart-gradient-good' };
+                if (value >= 25) return { rating: 'Fair', colorClass: 'text-status-fair', hex: getCssVariable('--status-fair'), gradientClass: 'chart-gradient-fair' };
+                return { rating: 'Poor', colorClass: 'text-status-poor', hex: getCssVariable('--status-poor'), gradientClass: 'chart-gradient-poor' };
+            }
+
+            // --- Create Chart Functions ---
+            function createBarChart(canvasId, labels, data) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Average Site Health Score',
+                            data: data,
+                            backgroundColor: data.map(val => getMetricRating(val).hex),
+                            borderRadius: 4,
+                            borderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { 
+                                callbacks: { 
+                                    title: (context) => context[0].label, 
+                                    label: (context) => `Avg. Score: ${context.raw}` 
+                                } 
+                            }
+                        },
+                        scales: {
+                            y: { 
+                                beginAtZero: true, 
+                                max: 100, 
+                                grid: { color: '#e2e8f0' }
+                            },
+                            x: { 
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function createGaugeChart(canvasId, score) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                const ratingInfo = getMetricRating(score);
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [score, 100 - score],
+                            backgroundColor: [ratingInfo.hex, getCssVariable('--chart-missed-bg')],
+                            borderColor: [ratingInfo.hex, getCssVariable('--chart-missed-bg')],
+                            borderWidth: 1,
+                            circumference: 270,
+                            rotation: 225,
+                            borderRadius: 8,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '80%',
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false },
+                        }
+                    }
+                });
+            }
+
+            // --- Modal Logic ---
+            function toggleModal(show) {
+                if (show) {
+                    jsonInput.value = JSON.stringify(currentData, null, 2); // Pre-fill with current data
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key.toLowerCase() === 'i') {
+                    e.preventDefault();
+                    toggleModal(true);
+                }
+            });
+
+            closeModalBtn.addEventListener('click', () => toggleModal(false));
+            
+            updateDataBtn.addEventListener('click', () => {
+                try {
+                    const newData = JSON.parse(jsonInput.value);
+                    if (Array.isArray(newData)) {
+                        currentData = newData;
+                        renderDashboard(currentData);
+                        toggleModal(false);
+                    } else {
+                        alert('Error: Data must be a valid JSON array.');
+                    }
+                } catch (error) {
+                    alert('Invalid JSON format. Please check your data.');
+                    console.error("JSON Parsing Error:", error);
+                }
+            });
+
+            // Initial Render
+            renderDashboard(currentData);
+        });
+    </script>
+</body>
+</html>
+

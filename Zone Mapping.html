@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HELIAUS Web App</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Interact.js for drag and resize functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+
+    <!-- Custom Styles -->
+    <style>
+        /* Set a height for the map container */
+        #map { 
+            height: calc(100vh - 64px); /* Full viewport height minus header height */
+            width: 100%;
+            z-index: 10; /* Ensure map is below other UI elements */
+        }
+        
+        /* Custom styling for the site name input to make it look like text */
+        .site-name-input {
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #d1d5db; /* Subtle bottom border */
+            border-radius: 0;
+            outline: none;
+            color: #111827;
+            padding: 0.5rem 0.2rem;
+            min-width: 150px;
+            width: auto;
+            transition: width 0.3s ease-in-out, border-color 0.3s ease-in-out;
+        }
+        .site-name-input:focus {
+            border-bottom-color: #3b82f6; /* Highlight with blue on focus */
+        }
+
+        /* Override browser autofill styles */
+        .site-name-input:-webkit-autofill,
+        .site-name-input:-webkit-autofill:hover, 
+        .site-name-input:-webkit-autofill:focus, 
+        .site-name-input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px white inset !important;
+            -webkit-text-fill-color: #111827 !important;
+        }
+
+        /* Styles for the movable/resizable info panel */
+        .info-panel {
+            position: absolute; /* Each panel is positioned independently */
+            touch-action: none; /* prevent default browser actions on touch */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            cursor: move; /* Indicate that the entire panel is draggable */
+            z-index: 20; /* Ensure panels are above the map */
+        }
+
+        /* Custom smaller font size for the table */
+        .info-panel table {
+            font-size: 0.6rem; /* Approx 9.6px, very small */
+            line-height: 0.9rem; /* Tighter line height */
+        }
+        
+        /* Styles for editable table cells */
+        .editable-cell {
+            transition: background-color 0.2s ease-in-out;
+        }
+        .editable-cell:hover {
+            background-color: #f0f9ff; /* A light blue hover effect */
+            cursor: text;
+        }
+        .editable-cell:focus {
+            background-color: #e0f2fe; /* A slightly darker blue when editing */
+            outline: 1px solid #38bdf8; /* Highlight the cell being edited */
+            border-radius: 2px;
+        }
+
+        /* Styles for the new geofence object */
+        .geofence-object {
+            position: absolute;
+            background-color: rgba(255, 0, 0, 0.3);
+            border: 2px solid #ef4444; /* red-500 */
+            z-index: 1500; /* Lower z-index */
+            touch-action: none;
+            box-sizing: border-box;
+        }
+
+        .geofence-object .rotation-handle {
+            background-color: #ef4444;
+            border: 1px solid white;
+        }
+
+        .geofence-object .resize-handle {
+            background: white;
+            border: 1px solid #ef4444;
+        }
+
+        /* Styles for the object box */
+        .object-box {
+            position: absolute;
+            background-color: transparent; /* Make background transparent */
+            padding: 1rem;
+            z-index: 2000; /* Higher z-index */
+            touch-action: none;
+            box-sizing: border-box;
+        }
+        
+        .object-box .rotation-handle {
+            background-color: #3b82f6;
+            border: 1px solid white;
+        }
+
+        .object-box .resize-handle {
+            background: white;
+            border: 1px solid #3b82f6;
+        }
+
+        .rotation-handle {
+            position: absolute;
+            top: 10px; /* Position inside the top of the geofence */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px; /* Width of the line */
+            height: 4px;  /* Thickness of the line */
+            border-radius: 2px;
+            cursor: grab;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        /* Styles for the resize handles */
+        .resize-handle {
+            position: absolute;
+            width: 12px; /* Made handles slightly larger */
+            height: 12px; /* Made handles slightly larger */
+            border-radius: 2px;
+            z-index: 2001;
+        }
+        .resize-handle.tl { top: -7px; left: -7px; cursor: nwse-resize; }
+        .resize-handle.tr { top: -7px; right: -7px; cursor: nesw-resize; }
+        .resize-handle.bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
+        .resize-handle.br { bottom: -7px; right: -7px; cursor: nwse-resize; }
+
+        .object-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Changed to 3 columns */
+            width: 100%;
+            height: 100%;
+        }
+        .zone-circle {
+            position: relative;
+            background-color: rgba(30, 58, 138, 0.5); /* translucent navy */
+            border: 2px solid #facc15; /* yellow-400 */
+            border-radius: 50%;
+            box-sizing: border-box;
+        }
+        .zone-circle-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- Header -->
+    <header class="bg-white text-gray-900 p-4 h-16 flex items-center justify-between shadow-lg fixed top-0 left-0 right-0 z-50">
+        <!-- Left Side: Title -->
+        <img src="https://files.constantcontact.com/08158993601/08b8ec46-9c22-4bd2-b8d1-e47fc0ba9a12.png?rdr=true" alt="HELIAUS Logo" class="h-8">
+        
+        <!-- Right Side: Site Name Input -->
+        <div class="flex items-center">
+            <input type="text" id="siteNameInput" class="site-name-input" placeholder="Site Name">
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main id="mainContent" class="pt-16 relative overflow-hidden"> <!-- pt-16 to offset for fixed header -->
+        
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Info Panels will be dynamically inserted here -->
+
+        <!-- Bottom Controls Container -->
+        <div class="fixed bottom-4 left-4 z-[1000]">
+            <!-- Dock containing all control buttons -->
+            <div id="controlsDock" class="flex items-center space-x-2 bg-white p-2 rounded-full shadow-md">
+                <!-- Toggle button to show/hide the dock -->
+                <button id="toggleDockBtn" class="bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" title="Toggle Controls">
+                    <svg id="dock-toggle-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-right"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+                </button>
+                <!-- Toggle Button for Search Box -->
+                <button id="toggleSearchBtn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" title="Search Address">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </button>
+                <!-- Search input, now inside the dock -->
+                <input type="text" id="addressInput" placeholder="Enter address..." class="hidden w-48 px-3 py-1 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300">
+                <!-- Button to add Geofence -->
+                <button id="addGeofenceBtn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" title="Toggle Geofence">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-square"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                </button>
+                <!-- Button to resize text -->
+                <button id="resizeTextBtn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500" title="Resize Table Text">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-type"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                </button>
+                 <!-- New Control Buttons -->
+                <button id="add-zone-btn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500" title="Add Zone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus-circle"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                </button>
+                <button id="remove-zone-btn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500" title="Remove Last Zone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-minus-circle"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                </button>
+                <button id="bulk-edit-btn" class="dock-item hidden bg-white p-2 rounded-full shadow-md hover:bg-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500" title="Bulk Edit Data">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+            </div>
+        </div>
+
+         <!-- Message Box for errors or info -->
+        <div id="messageBox" class="hidden fixed bottom-20 left-1/2 -translate-x-1/2 z-30 max-w-lg p-3" role="alert">
+            <span class="block sm:inline" id="messageText"></span>
+        </div>
+
+        <!-- Raw Data Modal (for bulk edit) -->
+        <div id="raw-data-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[2000] flex items-center justify-center">
+            <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                <div class="mt-3 text-center">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Bulk Edit Zone Data</h3>
+                    <div class="mt-2 px-7 py-3">
+                        <p class="text-sm text-gray-500 mb-2">Edit the tab-separated data below. Each line represents a row.</p>
+                        <textarea id="raw-data-input" rows="10" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"></textarea>
+                    </div>
+                    <div class="items-center px-4 py-3">
+                        <button id="cancel-raw-data" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 mr-2">Cancel</button>
+                        <button id="save-raw-data" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Initialize Map ---
+        const initialCoords = [39.8283, -98.5795];
+        const map = L.map('map', { zoomControl: false }).setView(initialCoords, 4);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        
+        // Switched to Google Satellite Layer
+        L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+            maxZoom: 22,
+            subdomains:['mt0','mt1','mt2','mt3'],
+            attribution: 'Map data &copy;2024 Google'
+        }).addTo(map);
+
+        // --- UI Element References ---
+        const mainContent = document.getElementById('mainContent');
+        const toggleSearchBtn = document.getElementById('toggleSearchBtn');
+        const addressInput = document.getElementById('addressInput');
+        const siteNameInput = document.getElementById('siteNameInput');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        let marker = null; 
+        
+        // Geofence and Text Size References
+        const addGeofenceBtn = document.getElementById('addGeofenceBtn');
+        const resizeTextBtn = document.getElementById('resizeTextBtn');
+
+        // --- State Variables ---
+        let tableData = []; // Central state for table data
+        const fontStyles = [
+            { size: '0.6rem', height: '0.9rem' }, // Small
+            { size: '0.75rem', height: '1rem' },   // Medium (Tailwind's text-xs)
+            { size: '0.875rem', height: '1.25rem' } // Large (Tailwind's text-sm)
+        ];
+        let currentFontSizeIndex = 0;
+
+        // --- Event Listeners ---
+        toggleSearchBtn.addEventListener('click', () => {
+            addressInput.classList.toggle('hidden');
+            if (!addressInput.classList.contains('hidden')) {
+                addressInput.focus();
+            }
+        });
+        
+        addGeofenceBtn.addEventListener('click', toggleGeofence);
+        resizeTextBtn.addEventListener('click', cycleTableFontSize);
+
+        addressInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        // Auto-resize logic for header inputs
+        function autoResizeInput(event) {
+            const inputElement = event.target;
+            let hiddenSpan = document.getElementById('hidden-span-for-width');
+            if (!hiddenSpan) {
+                hiddenSpan = document.createElement('span');
+                hiddenSpan.id = 'hidden-span-for-width';
+                hiddenSpan.style.visibility = 'hidden';
+                hiddenSpan.style.position = 'absolute';
+                hiddenSpan.style.whiteSpace = 'pre';
+                const inputStyle = window.getComputedStyle(inputElement);
+                hiddenSpan.style.font = inputStyle.font;
+                document.body.appendChild(hiddenSpan);
+            }
+            hiddenSpan.textContent = inputElement.value || inputElement.placeholder;
+            inputElement.style.width = (hiddenSpan.offsetWidth + 5) + 'px';
+        }
+
+        siteNameInput.addEventListener('input', autoResizeInput);
+        
+        // Trigger initial resize
+        siteNameInput.dispatchEvent(new Event('input'));
+
+        // --- Functions ---
+
+        /**
+         * Cycles through the predefined font sizes and applies them to all tables.
+         */
+        function cycleTableFontSize() {
+            currentFontSizeIndex = (currentFontSizeIndex + 1) % fontStyles.length;
+            const newStyle = fontStyles[currentFontSizeIndex];
+            
+            const allPanels = document.querySelectorAll('.info-panel');
+            allPanels.forEach(panel => {
+                const table = panel.querySelector('table');
+                if (table) {
+                    table.style.fontSize = newStyle.size;
+                    table.style.lineHeight = newStyle.height;
+                }
+            });
+        }
+        
+        /**
+         * Creates or updates a draggable box containing circle objects.
+         * The box's position, size, and rotation are preserved on updates.
+         */
+        function createObjectBox() {
+            const aliasCells = document.querySelectorAll('.info-panel tbody tr td:first-child');
+            let box = document.getElementById('object-box');
+
+            // If there's no data, remove the box if it exists and exit.
+            if (aliasCells.length === 0) {
+                if (box) {
+                    box.remove();
+                }
+                return;
+            }
+
+            // If the box doesn't exist, create it for the first time.
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'object-box';
+                box.className = 'object-box';
+                
+                const handle = document.createElement('div');
+                handle.className = 'rotation-handle';
+                box.appendChild(handle);
+
+                const corners = ['tl', 'tr', 'bl', 'br'];
+                corners.forEach(corner => {
+                    const resizeHandle = document.createElement('div');
+                    resizeHandle.className = `resize-handle ${corner}`;
+                    box.appendChild(resizeHandle);
+                });
+                
+                const grid = document.createElement('div');
+                grid.className = 'object-grid';
+                box.appendChild(grid);
+                
+                // Set initial position and size for a new box
+                box.style.width = '180px';
+                box.style.height = 'auto';
+                box.style.top = '50%';
+                box.style.left = '50%';
+                box.setAttribute('data-x', 0);
+                box.setAttribute('data-y', 0);
+                box.setAttribute('data-angle', 0);
+
+                mainContent.appendChild(box);
+                makeInteractive(box);
+            }
+
+            // Whether the box is new or old, update its content.
+            const grid = box.querySelector('.object-grid');
+            grid.innerHTML = ''; // Clear only the old circles
+
+            aliasCells.forEach(cell => {
+                const alias = cell.textContent;
+                const circle = document.createElement('div');
+                circle.className = 'zone-circle';
+                
+                const number = document.createElement('span');
+                number.className = 'zone-circle-number';
+                number.textContent = alias;
+
+                circle.appendChild(number);
+                grid.appendChild(circle);
+            });
+
+            resizeZoneObjects(box); // Adjust circle sizes
+        }
+        
+        /**
+         * Toggles the geofence object on and off.
+         */
+        function toggleGeofence() {
+            // Check if a geofence already exists
+            const existingGeofence = document.getElementById('geofence-object');
+            if (existingGeofence) {
+                // If it exists, remove it and stop.
+                existingGeofence.remove();
+                return;
+            }
+
+            // --- If it doesn't exist, create it ---
+
+            // Create the geofence element
+            const geofenceEl = document.createElement('div');
+            geofenceEl.id = 'geofence-object';
+            geofenceEl.className = 'geofence-object';
+            
+            // Create the rotation handle
+            const handle = document.createElement('div');
+            handle.className = 'rotation-handle';
+            geofenceEl.appendChild(handle);
+
+            // Create resize handles
+            const corners = ['tl', 'tr', 'bl', 'br'];
+            corners.forEach(corner => {
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = `resize-handle ${corner}`;
+                geofenceEl.appendChild(resizeHandle);
+            });
+
+            // Set initial position and size
+            geofenceEl.style.width = '250px';
+            geofenceEl.style.height = '200px';
+            geofenceEl.style.top = '40%';
+            geofenceEl.style.left = '50%';
+            
+            // Store transform data
+            geofenceEl.setAttribute('data-x', 0);
+            geofenceEl.setAttribute('data-y', 0);
+            geofenceEl.setAttribute('data-angle', 0);
+
+            // Append to the main content area to float above the map
+            mainContent.appendChild(geofenceEl);
+
+            // Make it interactive
+            makeInteractive(geofenceEl);
+        }
+
+
+        /**
+         * Renders tables, preserving the position of existing panels.
+         */
+        function renderTables() {
+            // Create a map to store the state (position) of each panel, keyed by its index.
+            const panelStates = new Map();
+            document.querySelectorAll('.info-panel').forEach((panel, index) => {
+                panelStates.set(index, {
+                    top: panel.style.top,
+                    left: panel.style.left,
+                    transform: panel.style.transform,
+                    x: panel.getAttribute('data-x'),
+                    y: panel.getAttribute('data-y')
+                });
+            });
+
+            // Clear existing tables from the DOM.
+            document.querySelectorAll('.info-panel').forEach(panel => panel.remove());
+            
+            const rowsPerTable = 31;
+
+            if (tableData.length === 0) {
+                const panel = document.createElement('div');
+                panel.className = 'info-panel bg-white bg-opacity-90 p-2 rounded-lg shadow-xl min-w-[360px] min-h-[150px]';
+                
+                // Check if there was a saved position for the first panel
+                if (panelStates.has(0)) {
+                    const state = panelStates.get(0);
+                    panel.style.top = state.top;
+                    panel.style.left = state.left;
+                    panel.style.transform = state.transform;
+                    panel.setAttribute('data-x', state.x || 0);
+                    panel.setAttribute('data-y', state.y || 0);
+                } else {
+                    panel.style.top = '5rem';
+                    panel.style.left = '4rem';
+                    panel.setAttribute('data-x', 0);
+                    panel.setAttribute('data-y', 0);
+                }
+
+                const table = document.createElement('table');
+                table.className = 'w-full text-left';
+                const currentStyle = fontStyles[currentFontSizeIndex];
+                table.style.fontSize = currentStyle.size;
+                table.style.lineHeight = currentStyle.height;
+                
+                table.innerHTML = `
+                    <thead class="text-gray-700 uppercase bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-1.5 py-1">Zone Alias</th>
+                            <th scope="col" class="px-1.5 py-1">Primary Zone</th>
+                            <th scope="col" class="px-1.5 py-1">Floor</th>
+                            <th scope="col" class="px-1.5 py-1">Zone Name</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                panel.appendChild(table);
+                mainContent.appendChild(panel);
+                makePanelsInteractive();
+                return;
+            }
+
+            // Chunk the data and create a table for each chunk
+            for (let i = 0; i < tableData.length; i += rowsPerTable) {
+                const chunk = tableData.slice(i, i + rowsPerTable);
+                const panel = document.createElement('div');
+                panel.className = 'info-panel bg-white bg-opacity-90 p-2 rounded-lg shadow-xl min-w-[360px] min-h-[150px]';
+                const panelIndex = i / rowsPerTable;
+
+                // If a state was saved for this panel index, reapply it.
+                if (panelStates.has(panelIndex)) {
+                    const state = panelStates.get(panelIndex);
+                    panel.style.top = state.top;
+                    panel.style.left = state.left;
+                    panel.style.transform = state.transform;
+                    panel.setAttribute('data-x', state.x || 0);
+                    panel.setAttribute('data-y', state.y || 0);
+                } else {
+                    // Otherwise, this is a new panel, give it a default staggered position.
+                    const panelOffset = panelIndex * 24;
+                    panel.style.top = '5rem';
+                    panel.style.left = `${4 + panelOffset}rem`;
+                    panel.setAttribute('data-x', 0);
+                    panel.setAttribute('data-y', 0);
+                }
+
+                const table = document.createElement('table');
+                table.className = 'w-full text-left';
+                const currentStyle = fontStyles[currentFontSizeIndex];
+                table.style.fontSize = currentStyle.size;
+                table.style.lineHeight = currentStyle.height;
+                const tbody = document.createElement('tbody');
+
+                table.innerHTML = `
+                    <thead class="text-gray-700 uppercase bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-1.5 py-1">Zone Alias</th>
+                            <th scope="col" class="px-1.5 py-1">Primary Zone</th>
+                            <th scope="col" class="px-1.5 py-1">Floor</th>
+                            <th scope="col" class="px-1.5 py-1">Zone Name</th>
+                        </tr>
+                    </thead>
+                `;
+                
+                chunk.forEach(rowData => {
+                    const newRow = tbody.insertRow();
+                    newRow.className = 'bg-white border-b';
+                    newRow.innerHTML = `
+                        <td class="px-1.5 py-0.5 editable-cell" contenteditable="true">${rowData.alias}</td>
+                        <td class="px-1.5 py-0.5 editable-cell" contenteditable="true">${rowData.primaryZone}</td>
+                        <td class="px-1.5 py-0.5 editable-cell" contenteditable="true">${rowData.floor}</td>
+                        <td class="px-1.5 py-0.5 editable-cell" contenteditable="true">${rowData.name}</td>
+                    `;
+                });
+
+                table.appendChild(tbody);
+                panel.appendChild(table);
+                mainContent.appendChild(panel);
+            }
+            
+            makePanelsInteractive();
+        }
+
+        async function performSearch() {
+            const query = addressInput.value;
+            if (!query) {
+                showMessage('Please enter an address.', 'error');
+                return;
+            }
+            hideMessage();
+            if (marker) map.removeLayer(marker);
+
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Network response was not ok.');
+                const data = await response.json();
+
+                if (data && data.length > 0) {
+                    const { lat, lon, display_name } = data[0];
+                    const coords = [parseFloat(lat), parseFloat(lon)];
+                    map.flyTo(coords, 18);
+                    marker = L.marker(coords).addTo(map).bindPopup(`<b>${display_name}</b>`).openPopup();
+                } else {
+                    showMessage('Address not found. Please try again.', 'error');
+                }
+            } catch (error) {
+                console.error('Error during geocoding:', error);
+                showMessage('Could not fetch location. Check your connection.', 'error');
+            }
+        }
+
+        function showMessage(text, type = 'error') {
+            messageText.textContent = text;
+            messageBox.className = 'shadow-md rounded-lg p-3'; // Reset classes
+            const colorClass = type === 'error' 
+                ? 'bg-red-100 border border-red-400 text-red-700' 
+                : 'bg-blue-100 border border-blue-400 text-blue-700';
+            messageBox.classList.add(...colorClass.split(' '));
+            messageBox.classList.remove('hidden');
+            setTimeout(() => hideMessage(), 5000); // Auto-hide after 5 seconds
+        }
+
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+        }
+
+        /**
+         * Resizes the circles and their numbers inside a container to fit its width.
+         * @param {HTMLElement} boxElement - The .object-box element.
+         */
+        function resizeZoneObjects(boxElement) {
+            const grid = boxElement.querySelector('.object-grid');
+            if (!grid) return;
+
+            const boxWidth = boxElement.getBoundingClientRect().width - 32; // Subtract padding
+            const numColumns = 3;
+            const gapRatio = 0.2; // 20% of circle width
+
+            // Calculation: boxWidth = (numColumns * circleSize) + ((numColumns - 1) * gap)
+            // where gap = circleSize * gapRatio
+            // boxWidth = circleSize * (numColumns + (numColumns - 1) * gapRatio)
+            const circleSize = boxWidth / (numColumns + (numColumns - 1) * gapRatio);
+            const gapSize = circleSize * gapRatio;
+            const fontSize = circleSize / 3;
+
+            grid.style.gap = `${gapSize}px`;
+            
+            const circles = boxElement.querySelectorAll('.zone-circle');
+            circles.forEach(circle => {
+                circle.style.width = `${circleSize}px`;
+                circle.style.height = `${circleSize}px`;
+                const number = circle.querySelector('.zone-circle-number');
+                if (number) {
+                    number.style.fontSize = `${fontSize}px`;
+                }
+            });
+        }
+
+        /**
+         * Applies draggable and resizable behavior to a given element.
+         * @param {HTMLElement} element - The element to make interactive.
+         */
+        function makeInteractive(element) {
+            const handle = element.querySelector('.rotation-handle');
+            interact(element)
+                .draggable({
+                    listeners: {
+                        move(event) {
+                            const target = event.target;
+                            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+                            const angle = parseFloat(target.getAttribute('data-angle')) || 0;
+
+                            target.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+                            target.setAttribute('data-x', x);
+                            target.setAttribute('data-y', y);
+                        }
+                    }
+                })
+                .resizable({
+                    edges: { left: true, right: true, bottom: true, top: true },
+                    listeners: {
+                        move(event) {
+                            const target = event.target;
+                            let x = (parseFloat(target.getAttribute('data-x')) || 0);
+                            let y = (parseFloat(target.getAttribute('data-y')) || 0);
+                            const angle = parseFloat(target.getAttribute('data-angle')) || 0;
+
+                            target.style.width = `${event.rect.width}px`;
+                            target.style.height = `${event.rect.height}px`;
+
+                            x += event.deltaRect.left;
+                            y += event.deltaRect.top;
+                            
+                            target.style.transform = `translate(${x}px, ${y}px) rotate(${angle}deg)`;
+                            target.setAttribute('data-x', x);
+                            target.setAttribute('data-y', y);
+
+                            if (target.classList.contains('object-box')) {
+                                resizeZoneObjects(target);
+                            }
+                        }
+                    }
+                });
+            
+            if(handle) {
+                interact(handle).draggable({
+                    onstart: function(event) {
+                        const box = element.getBoundingClientRect();
+                        const centerX = box.left + box.width / 2;
+                        const centerY = box.top + box.height / 2;
+                        const startAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+                        element.setAttribute('data-start-angle', startAngle);
+                        element.setAttribute('data-rotation', parseFloat(element.getAttribute('data-angle')));
+                    },
+                    onmove: function(event) {
+                        const box = element.getBoundingClientRect();
+                        const centerX = box.left + box.width / 2;
+                        const centerY = box.top + box.height / 2;
+                        const currentAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+                        const startAngle = parseFloat(element.getAttribute('data-start-angle'));
+                        const initialRotation = parseFloat(element.getAttribute('data-rotation'));
+                        const newAngle = initialRotation + (currentAngle - startAngle) * (180 / Math.PI);
+                        
+                        const x = parseFloat(element.getAttribute('data-x')) || 0;
+                        const y = parseFloat(element.getAttribute('data-y')) || 0;
+
+                        element.style.transform = `translate(${x}px, ${y}px) rotate(${newAngle}deg)`;
+                        element.setAttribute('data-angle', newAngle);
+                    }
+                });
+
+                handle.addEventListener('dblclick', (e) => e.stopPropagation());
+            }
+        }
+
+        /**
+         * Applies draggable behavior to all panels with the .info-panel class.
+         */
+        function makePanelsInteractive() {
+             interact('.info-panel')
+                .draggable({
+                    inertia: true,
+                    modifiers: [
+                        interact.modifiers.restrictRect({
+                            restriction: 'parent',
+                            endOnly: true
+                        })
+                    ],
+                    autoScroll: true,
+                    listeners: { 
+                        move: function (event) {
+                            const target = event.target;
+                            const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+                            const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
+
+                            target.style.transform = `translate(${x}px, ${y}px)`;
+                            target.setAttribute('data-x', x);
+                            target.setAttribute('data-y', y);
+                        }
+                       }
+                });
+        }
+
+        // --- New Control Button Logic ---
+        function setupControlButtons() {
+            const addZoneBtn = document.getElementById('add-zone-btn');
+            const removeZoneBtn = document.getElementById('remove-zone-btn');
+            const bulkEditBtn = document.getElementById('bulk-edit-btn');
+            const modal = document.getElementById('raw-data-modal');
+            const rawDataInput = document.getElementById('raw-data-input');
+            const saveRawDataBtn = document.getElementById('save-raw-data');
+            const cancelRawDataBtn = document.getElementById('cancel-raw-data');
+            const toggleDockBtn = document.getElementById('toggleDockBtn');
+            const controlsDock = document.getElementById('controlsDock');
+            const dockToggleIcon = document.getElementById('dock-toggle-icon');
+
+            toggleDockBtn.addEventListener('click', () => {
+                const dockItems = controlsDock.querySelectorAll('.dock-item');
+                let isHidden = false;
+                dockItems.forEach(item => {
+                    item.classList.toggle('hidden');
+                    if (item.classList.contains('hidden')) {
+                        isHidden = true;
+                    }
+                });
+
+                if (isHidden) {
+                    dockToggleIcon.innerHTML = `<polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline>`; // chevrons-right
+                } else {
+                    dockToggleIcon.innerHTML = `<polyline points="11 7 6 12 11 17"></polyline><polyline points="18 7 13 12 18 17"></polyline>`; // chevrons-left
+                }
+            });
+            
+            addZoneBtn.addEventListener('click', () => {
+                const newId = tableData.length > 0 ? Math.max(...tableData.map(d => d.alias)) + 1 : 1;
+                tableData.push({ alias: newId, primaryZone: siteNameInput.value, floor: "", name: "" });
+                renderTables();
+                createObjectBox();
+            });
+
+            removeZoneBtn.addEventListener('click', () => {
+                if (tableData.length > 0) {
+                    tableData.pop();
+                    renderTables();
+                    createObjectBox();
+                }
+            });
+
+            bulkEditBtn.addEventListener('click', () => {
+                const textData = tableData.map(row => `${row.alias}\t${row.primaryZone}\t${row.floor}\t${row.name}`).join('\n');
+                rawDataInput.value = textData;
+                modal.classList.remove('hidden');
+            });
+
+            cancelRawDataBtn.addEventListener('click', () => {
+                modal.classList.add('hidden');
+            });
+
+            saveRawDataBtn.addEventListener('click', () => {
+                const lines = rawDataInput.value.split('\n').filter(line => line.trim() !== '');
+                const newTableData = lines.map(line => {
+                    const parts = line.split('\t');
+                    return {
+                        alias: parseInt(parts[0]) || 0,
+                        primaryZone: parts[1] || '',
+                        floor: parts[2] || '',
+                        name: parts[3] || ''
+                    };
+                });
+                tableData = newTableData;
+                renderTables();
+                createObjectBox();
+                modal.classList.add('hidden');
+            });
+        }
+
+        // Initialize the new buttons
+        setupControlButtons();
+        // Initial render of the default table
+        renderTables();
+
+    </script>
+</body>
+</html>
+
